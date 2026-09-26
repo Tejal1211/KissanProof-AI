@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import path from "node:path";
 import { config } from "./config.js";
 import { authRouter } from "./routes/auth.js";
 import { documentsRouter } from "./routes/documents.js";
@@ -36,6 +37,17 @@ app.use("/api/documents", documentsRouter);
 // inside claims.ts/chat.ts per-route so the rest of the router isn't throttled.
 app.use("/api/claims", claimsRouter);
 app.use("/api/chat", chatRouter);
+
+if (process.env.STATIC_DIR) {
+  const staticDir = path.resolve(process.env.STATIC_DIR);
+  app.use(express.static(staticDir));
+  app.get("*", (req, res, next) => {
+    if (req.path === "/api" || req.path.startsWith("/api/")) return next();
+    res.sendFile(path.join(staticDir, "index.html"), (err) => {
+      if (err) next(err);
+    });
+  });
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);

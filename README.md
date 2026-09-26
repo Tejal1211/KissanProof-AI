@@ -212,6 +212,25 @@ MAX_FILE_SIZE_MB=10
 MAX_FILES_PER_CLAIM=8
 ```
 
+## Deploy to Google Cloud Run
+
+The root `Dockerfile` builds the frontend and backend into one service, so the public web app and `/api` share
+the same origin. Before deploying, enable billing for your Google Cloud project, enable Cloud Run, Cloud Build,
+Artifact Registry, and Secret Manager APIs, rotate any previously exposed Gemini key, and create Secret Manager
+versions named `GEMINI_API_KEY` and `JWT_SECRET`. The Cloud Run runtime service account needs
+`roles/secretmanager.secretAccessor` on those secrets. Never put secret values in this repository or Docker image.
+
+From the repository root, deploy with:
+
+```powershell
+gcloud run deploy kisanproof-ai --source . --region us-central1 --allow-unauthenticated --min 0 --max 1 --set-env-vars "NODE_ENV=production,AI_PROVIDER=gemini,GEMINI_MODEL=gemini-3.8-flash,DATA_DIR=/tmp/kisanproof-data" --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,JWT_SECRET=JWT_SECRET:latest"
+```
+
+Cloud Run prints the public service URL when deployment completes. Verify it by opening that URL and appending
+`/api/health`. This demo stores accounts, claims, and uploads on the container's ephemeral filesystem; data can
+be lost when Cloud Run replaces an instance. Do not use this deployment for real sensitive documents or
+reliable long-term storage until the storage adapter is migrated to Firestore and Cloud Storage.
+
 ## API reference (summary)
 
 All responses: `{ "success": true, "data": {...} }` or `{ "success": false, "error": { "code", "message" } }`.
