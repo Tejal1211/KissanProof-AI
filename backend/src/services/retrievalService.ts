@@ -1,6 +1,9 @@
 import type { DocumentChunk, StoredDocument } from "../types.js";
 import { chunkDocument } from "./documentService.js";
 
+const documentChunkCache = new WeakMap<StoredDocument, DocumentChunk[]>();
+const chunkTokenCache = new WeakMap<DocumentChunk, { tokens: Set<string>; length: number }>();
+
 /**
  * Retrieval for the "Ask Your Document" RAG chat and for claim analysis
  * context limiting.
@@ -22,21 +25,30 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length > 2);
 }
 
-function scoreChunk(queryTokens: string[], chunkText: string): number {
-  const chunkTokens = tokenize(chunkText);
-  const set = new Set(chunkTokens);
+function scoreChunk(queryTokens: string[], chunk: DocumentChunk): number {
+  let index = chunkTokenCache.get(chunk);
+  if (!index) {
+    const tokens = tokenize(chunk.text);
+    index = { tokens: new Set(tokens), length: tokens.length };
+    chunkTokenCache.set(chunk, index);
+  }
+
   let score = 0;
   for (const qt of queryTokens) {
-    if (set.has(qt)) score += 1;
+    if (index.tokens.has(qt)) score += 1;
   }
-  return score / Math.max(1, Math.sqrt(chunkTokens.length));
+  return score / Math.max(1, Math.sqrt(index.length));
 }
 
 export function buildChunksForDocuments(documents: StoredDocument[]): DocumentChunk[] {
   const chunks: DocumentChunk[] = [];
   for (const doc of documents) {
     if (!doc.pages || doc.pages.length === 0) continue;
-    const docChunks = chunkDocument(doc, doc.pages).map((c) => ({ ...c, documentId: doc.id }));
+    let docChunks = documentChunkCache.get(doc);
+    if (!docChunks) {
+      docChunks = chunkDocument(doc, doc.pages).map((chunk) => ({ ...chunk, documentId: doc.id }));
+      documentChunkCache.set(doc, docChunks);
+    }
     chunks.push(...docChunks);
   }
   return chunks;
@@ -51,7 +63,7 @@ export function topChunks(query: string, chunks: DocumentChunk[], k = 6): Docume
 
   const ranked: { chunk: DocumentChunk; score: number }[] = [];
   for (const chunk of chunks) {
-    const candidate = { chunk, score: scoreChunk(queryTokens, chunk.text) };
+    const candidate = { chunk, score: scoreChunk(queryTokens, chunk) };
     const insertionIndex = ranked.findIndex((item) => candidate.score > item.score);
     if (insertionIndex === -1) {
       if (ranked.length < limit) ranked.push(candidate);

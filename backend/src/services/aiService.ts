@@ -4,6 +4,7 @@ import { config, isAiConfigured } from "../config.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { claimAnalysisSchema, chatAnswerSchema } from "../validators/schemas.js";
 import { buildAnalysisPrompt, buildChatPrompt } from "../ai/prompts.js";
+import { callStructuredWithRetry } from "./structuredResponseService.js";
 import type { ClaimAnalysis, Language } from "../types.js";
 
 const anthropicClient = config.anthropicApiKey ? new Anthropic({ apiKey: config.anthropicApiKey }) : null;
@@ -25,7 +26,7 @@ async function callAnthropic(prompt: string) {
 
   const textBlock = response.content.find((b) => b.type === "text");
   const raw = textBlock && "text" in textBlock ? textBlock.text : "";
-  return JSON.parse(extractJsonText(raw));
+  return extractJsonText(raw);
 }
 
 async function callGemini(prompt: string) {
@@ -59,7 +60,7 @@ async function callGemini(prompt: string) {
     ?.map((part: { text?: string }) => part.text ?? "")
     .join("") ?? "";
 
-  return JSON.parse(extractJsonText(raw));
+  return extractJsonText(raw);
 }
 
 /**
@@ -77,32 +78,9 @@ async function callStructured<T>(prompt: string, schema: z.ZodSchema<T>): Promis
     );
   }
 
-  const attempt = async (extra?: string) => {
-    const fullPrompt = extra ? `${prompt}\n\n${extra}` : prompt;
-    if (config.provider === "gemini") {
-      return await callGemini(fullPrompt);
-    }
-    return await callAnthropic(fullPrompt);
-  };
-
-  try {
-    const parsed = await attempt();
-    return schema.parse(parsed);
-  } catch (firstErr) {
-    try {
-      const parsed = await attempt(
-        "Your previous response was not valid JSON matching the required schema. Respond with ONLY the JSON object, no other text."
-      );
-      return schema.parse(parsed);
-    } catch (secondErr) {
-      console.error("AI structured-output validation failed twice:", firstErr, secondErr);
-      throw new AppError(
-        "AI_RESPONSE_INVALID",
-        "We couldn't complete the analysis. Please try again.",
-        502
-      );
-    }
-  }
+  return callStructuredWithRetry(prompt, schema, (fullPrompt) =>
+    config.provider === "gemini" ? callGemini(fullPrompt) : callAnthropic(fullPrompt)
+  );
 }
 
 export async function analyzeClaim(input: {

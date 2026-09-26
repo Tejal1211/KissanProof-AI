@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { topChunks, capChunksByChars } from "../src/services/retrievalService.js";
-import type { DocumentChunk } from "../src/types.js";
+import { buildChunksForDocuments, topChunks, capChunksByChars } from "../src/services/retrievalService.js";
+import type { DocumentChunk, StoredDocument } from "../src/types.js";
 
 const chunks: DocumentChunk[] = [
   { documentId: "1", documentName: "insurance.pdf", page: 1, text: "The claim deadline is 30 days after the event." },
@@ -34,6 +34,30 @@ describe("topChunks", () => {
   it("handles zero and negative result limits", () => {
     expect(topChunks("deadline", chunks, 0)).toEqual([]);
     expect(topChunks("deadline", chunks, -2)).toEqual([]);
+  });
+});
+
+describe("buildChunksForDocuments", () => {
+  it("reuses chunk objects while an unchanged stored document stays the same", () => {
+    const document: StoredDocument = {
+      id: "doc-1",
+      userId: "user-1",
+      claimId: "claim-1",
+      originalName: "policy.txt",
+      mimeType: "text/plain",
+      sizeBytes: 20,
+      storagePath: "uploads/policy.txt",
+      extractedText: "claim deadline is 30 days",
+      pages: [{ page: 1, text: "claim deadline is 30 days" }],
+      status: "processed",
+      error: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    const first = buildChunksForDocuments([document]);
+    const second = buildChunksForDocuments([document]);
+
+    expect(second[0]).toBe(first[0]);
   });
 });
 
