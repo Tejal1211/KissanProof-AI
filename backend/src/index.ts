@@ -52,6 +52,10 @@ if (process.env.STATIC_DIR) {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(config.port, () => {
-  console.log(`KisanProof AI backend listening on port ${config.port}`);
-});
+export default app;
+
+if (process.env.NODE_ENV !== "production") {
+  app.listen(config.port, () => {
+    console.log(`KisanProof AI backend listening on port ${config.port}`);
+  });
+}
