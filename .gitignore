@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+
+# Env / secrets
+.env*
+!.env.example
+
+# Firebase
+serviceAccountKey.json
+firebase-adminsdk-*.json
+
+# Local data / uploads (demo JSON "DB" and uploaded files)
+backend/data/
+*.log
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Test artifacts
+coverage/
+*.tsbuildinfo
