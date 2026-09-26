@@ -28,6 +28,11 @@ export const createClaimSchema = z.object({
   farmArea: z.string().max(40).optional().default(""),
   eventDescription: z.string().max(1000).optional().default(""),
   eventDate: z.string().max(40).optional().default(""),
+  documentIds: z
+    .array(z.string().uuid())
+    .max(8)
+    .refine((ids) => new Set(ids).size === ids.length, "Document IDs must be unique.")
+    .default([]),
 });
 
 export const chatSchema = z.object({

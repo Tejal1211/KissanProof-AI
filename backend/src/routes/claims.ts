@@ -14,6 +14,7 @@ import {
   updateDocument,
 } from "../db.js";
 import { analyzeClaim } from "../services/aiService.js";
+import { assertDocumentsClaimableByUser } from "../services/documentService.js";
 import { buildEvidenceChecklist } from "../services/consistencyService.js";
 import type { Claim } from "../types.js";
 export const claimsRouter = Router();
@@ -23,7 +24,9 @@ claimsRouter.post(
   "/",
   asyncHandler(async (req: AuthedRequest, res) => {
     const body = createClaimSchema.parse(req.body);
-    const documentIds: string[] = Array.isArray(req.body?.documentIds) ? req.body.documentIds : [];
+    const documentIds = body.documentIds;
+    const documents = await getDocumentsByIds(documentIds);
+    assertDocumentsClaimableByUser(documentIds, documents, req.userId!);
 
     const claim: Claim = {
       id: uuid(),

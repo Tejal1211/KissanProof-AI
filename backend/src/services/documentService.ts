@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 // pdf-parse has no ESM types export; require via createRequire for reliability.
 import { createRequire } from "node:module";
+import { AppError } from "../middleware/errorHandler.js";
 const require = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pdfParse = require("pdf-parse");
@@ -9,6 +10,15 @@ import type { DocumentPage, DocumentChunk, StoredDocument } from "../types.js";
 
 const CHUNK_SIZE_CHARS = 1200;
 const CHUNK_OVERLAP_CHARS = 150;
+
+export function assertDocumentsClaimableByUser(documentIds: string[], documents: StoredDocument[], userId: string) {
+  if (
+    documentIds.length !== documents.length ||
+    documents.some((document) => document.userId !== userId || document.claimId !== null)
+  ) {
+    throw new AppError("DOCUMENTS_NOT_AVAILABLE", "One or more selected documents are unavailable.", 404);
+  }
+}
 
 /**
  * Extracts text from a document, preserving page numbers where the format
