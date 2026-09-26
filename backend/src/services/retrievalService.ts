@@ -43,13 +43,26 @@ export function buildChunksForDocuments(documents: StoredDocument[]): DocumentCh
 }
 
 export function topChunks(query: string, chunks: DocumentChunk[], k = 6): DocumentChunk[] {
-  const queryTokens = tokenize(query);
-  if (queryTokens.length === 0 || chunks.length === 0) return chunks.slice(0, k);
-  return chunks
-    .map((c) => ({ chunk: c, score: scoreChunk(queryTokens, c.text) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k)
-    .map((r) => r.chunk);
+  const limit = Math.max(0, Math.floor(k));
+  if (limit === 0 || chunks.length === 0) return [];
+
+  const queryTokens = Array.from(new Set(tokenize(query)));
+  if (queryTokens.length === 0) return chunks.slice(0, limit);
+
+  const ranked: { chunk: DocumentChunk; score: number }[] = [];
+  for (const chunk of chunks) {
+    const candidate = { chunk, score: scoreChunk(queryTokens, chunk.text) };
+    const insertionIndex = ranked.findIndex((item) => candidate.score > item.score);
+    if (insertionIndex === -1) {
+      if (ranked.length < limit) ranked.push(candidate);
+      continue;
+    }
+
+    ranked.splice(insertionIndex, 0, candidate);
+    if (ranked.length > limit) ranked.pop();
+  }
+
+  return ranked.map((item) => item.chunk);
 }
 
 /** Caps total context sent to the model so we never resend whole documents per question. */

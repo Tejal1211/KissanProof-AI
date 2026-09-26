@@ -18,6 +18,23 @@ describe("topChunks", () => {
     const result = topChunks("??", chunks, 2);
     expect(result).toHaveLength(2);
   });
+
+  it("keeps only the highest-scoring chunks and preserves input order for ties", () => {
+    const input = [
+      { ...chunks[2], text: "administrative" },
+      { ...chunks[0], text: "deadline" },
+      { ...chunks[1], text: "claim" },
+    ];
+    const result = topChunks("deadline claim", input, 2);
+
+    expect(result).toEqual(input.slice(1));
+    expect(input[0].text).toBe("administrative");
+  });
+
+  it("handles zero and negative result limits", () => {
+    expect(topChunks("deadline", chunks, 0)).toEqual([]);
+    expect(topChunks("deadline", chunks, -2)).toEqual([]);
+  });
 });
 
 describe("capChunksByChars", () => {
@@ -31,5 +48,10 @@ describe("capChunksByChars", () => {
     const capped = capChunksByChars(bigChunks, 3500);
     const total = capped.reduce((sum, c) => sum + c.text.length, 0);
     expect(total).toBeLessThanOrEqual(3500);
+  });
+
+  it("stops before adding a chunk that would exceed the budget", () => {
+    const result = capChunksByChars(chunks, chunks[0].text.length + 1);
+    expect(result).toEqual([chunks[0]]);
   });
 });
