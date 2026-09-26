@@ -269,7 +269,8 @@ builds complete successfully.
 
 - Server-side-only API keys; nothing secret ships to the browser.
 - JWT-based session auth; every claim/document/chat route checks `req.userId` ownership.
-- Multer file-type/size/count validation; rejected files never touch disk.
+- Multer size/count and filename/header validation, followed by byte-signature or UTF-8 content checks before
+  database insertion; content mismatches are deleted from temporary upload storage.
 - Zod validation on every request body **and** on AI output (invalid AI JSON is retried once, then a controlled
   error — never a crash, never silently fabricated data).
 - Rate limiting: 300 req/15 min generally, 12 req/min on the two AI-backed routes.

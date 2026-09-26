@@ -1,10 +1,12 @@
 import { Router } from "express";
+import fs from "node:fs/promises";
 import { v4 as uuid } from "uuid";
 import { upload } from "../middleware/upload.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { asyncHandler, AppError } from "../middleware/errorHandler.js";
 import { saveDocument, updateDocument, getDocumentsByUser, deleteDocument, getDocumentsByIds } from "../db.js";
 import { extractText } from "../services/documentService.js";
+import { isSupportedDocumentContent } from "../services/uploadValidationService.js";
 import type { StoredDocument } from "../types.js";
 
 export const documentsRouter = Router();
@@ -22,7 +24,27 @@ documentsRouter.post(
             : "One of the files is too large or there are too many files.";
         return res.status(400).json({ success: false, error: { code, message } });
       }
-      next();
+      const files = (req.files as Express.Multer.File[]) ?? [];
+      void (async () => {
+        try {
+          for (const file of files) {
+            const content = await fs.readFile(file.path);
+            if (!(await isSupportedDocumentContent(file.originalname, file.mimetype, content))) {
+              throw new Error("UNSUPPORTED_FILE_TYPE");
+            }
+          }
+          next();
+        } catch {
+          await Promise.all(files.map((file) => fs.unlink(file.path).catch(() => undefined)));
+          res.status(400).json({
+            success: false,
+            error: {
+              code: "UNSUPPORTED_FILE_TYPE",
+              message: "One of the files doesn't match its supported file type.",
+            },
+          });
+        }
+      })();
     });
   },
   asyncHandler(async (req: AuthedRequest, res) => {
